@@ -1,0 +1,139 @@
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.Condition;
+
+class LectoresEscritores {
+    private int lectoresActivos = 0;  // Contador de lectores activos
+    private boolean escritorActivo = false;  // Indica si hay un escritor activo
+    private final Lock lock = new ReentrantLock();  // Lock para controlar acceso
+    private final Condition puedeLeer = lock.newCondition();  // Condición para lectores
+    private final Condition puedeEscribir = lock.newCondition();  // Condición para escritores
+
+    // Método para permitir a un lector leer
+    public void iniciarLectura(int id) throws InterruptedException {
+        lock.lock();
+        try {
+            // Si hay un escritor activo, el lector debe esperar
+            while (escritorActivo) {
+                puedeLeer.await();
+            }
+            lectoresActivos++;  // Incrementa el número de lectores activos
+            System.out.println("Lector " + id + " está leyendo. Lectores activos: " + lectoresActivos);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Método para indicar que un lector ha terminado de leer
+    public void terminarLectura(int id) {
+        lock.lock();
+        try {
+            lectoresActivos--;  // Decrementa el número de lectores activos
+            System.out.println("Lector " + id + " terminó de leer. Lectores activos: " + lectoresActivos);
+
+            // Si ya no hay lectores activos, notificar a los escritores
+            if (lectoresActivos == 0) {
+                puedeEscribir.signal();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Método para permitir a un escritor escribir
+    public void iniciarEscritura(int id) throws InterruptedException {
+        lock.lock();
+        try {
+            // Si hay un escritor activo o lectores activos, el escritor debe esperar
+            while (escritorActivo || lectoresActivos > 0) {
+                puedeEscribir.await();
+            }
+            escritorActivo = true;  // Indica que el escritor está escribiendo
+            System.out.println("Escritor " + id + " está escribiendo.");
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    // Método para indicar que un escritor ha terminado de escribir
+    public void terminarEscritura(int id) {
+        lock.lock();
+        try {
+            escritorActivo = false;  // Libera el control de escritura
+            System.out.println("Escritor " + id + " terminó de escribir.");
+
+            // Notificar a los lectores que pueden leer o a otro escritor que puede escribir
+            puedeLeer.signalAll();
+            puedeEscribir.signal();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+
+// Clase Lector que simula un hilo de lectura
+class Lector extends Thread {
+    private final LectoresEscritores recurso;
+    private final int id;
+
+    public Lector(LectoresEscritores recurso, int id) {
+        this.recurso = recurso;
+        this.id = id;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                recurso.iniciarLectura(id);
+                Thread.sleep(8000);  // Simular tiempo de lectura
+                recurso.terminarLectura(id);
+                Thread.sleep(10000);  // Esperar antes de leer otra vez
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+// Clase Escritor que simula un hilo de escritura
+class Escritor extends Thread {
+    private final LectoresEscritores recurso;
+    private final int id;
+
+    public Escritor(LectoresEscritores recurso, int id) {
+        this.recurso = recurso;
+        this.id = id;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                recurso.iniciarEscritura(id);
+                Thread.sleep(7000);  // Simular tiempo de escritura
+                recurso.terminarEscritura(id);
+                Thread.sleep(12000);  // Esperar antes de escribir otra vez
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+// Clase principal para ejecutar la simulación
+public class LectoresEscritoresProblema {
+    public static void main(String[] args) {
+        LectoresEscritores recurso = new LectoresEscritores();
+
+        // Crear y arrancar 5 lectores
+        for (int i = 1; i <= 5; i++) {
+            new Lector(recurso, i).start();
+        }
+
+        // Crear y arrancar 2 escritores
+        for (int i = 1; i <= 2; i++) {
+            new Escritor(recurso, i).start();
+        }
+    }
+}
