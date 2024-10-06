@@ -1,0 +1,95 @@
+import java.util.LinkedList;
+import java.util.Queue;
+
+class Monitor {
+    private final Queue<Integer> cola;
+    private final int LIMITE;
+
+    public Monitor(int limite) {
+        this.cola = new LinkedList<>();
+        this.LIMITE = limite;
+    }
+
+    public synchronized void producir(int valor) throws InterruptedException {
+        // Si la cola está llena, el productor espera
+        while (cola.size() == LIMITE) {
+            System.out.println("Cola llena. Productor esperando...");
+            wait(); // Poner al hilo en espera
+        }
+
+        // Producir el valor y agregarlo a la cola
+        cola.add(valor);
+        System.out.println("Producto agregado: " + valor);
+        
+        // Notificar a los consumidores
+        notifyAll(); // Despertar a los hilos que están esperando
+    }
+
+    public synchronized int consumir() throws InterruptedException {
+        // Si la cola está vacía, el consumidor espera
+        while (cola.isEmpty()) {
+            System.out.println("Cola vacía. Consumidor esperando...");
+            wait(); // Poner al hilo en espera
+        }
+
+        // Consumir el valor y eliminarlo de la cola
+        int valor = cola.poll();
+        System.out.println("Producto consumido: " + valor);
+
+        // Notificar a los productores
+        notifyAll(); // Despertar a los hilos que están esperando
+        return valor;
+    }
+}
+
+class Productor extends Thread {
+    private final Monitor monitor;
+
+    public Productor(Monitor monitor) {
+        this.monitor = monitor;
+    }
+
+    @Override
+    public void run() {
+        try {
+            for (int i = 0; i < 10; i++) {
+                monitor.producir(i);
+                Thread.sleep(5000);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+class Consumidor extends Thread {
+    private final Monitor monitor;
+
+    public Consumidor(Monitor monitor) {
+        this.monitor = monitor;
+    }
+
+    @Override
+    public void run() {
+        try {
+            for (int i = 0; i < 10; i++) {
+                monitor.consumir(); 
+                Thread.sleep(3000); 
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+public class SimulacionMonitor {
+    public static void main(String[] args) {
+        Monitor monitor = new Monitor(5);
+
+        Productor productor = new Productor(monitor);
+        Consumidor consumidor = new Consumidor(monitor);
+
+        productor.start();
+        consumidor.start(); 
+    }
+}
