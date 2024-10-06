@@ -1,0 +1,84 @@
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.Condition;
+
+class Tenedor {
+    private final Lock lock = new ReentrantLock();
+
+    public void levantar() {
+        lock.lock(); 
+    }
+
+    public void soltar() {
+        lock.unlock();
+    }
+}
+
+class Filosofo extends Thread {
+    private final int id;
+    private final Tenedor tenedorIzquierdo;
+    private final Tenedor tenedorDerecho;
+
+    public Filosofo(int id, Tenedor tenedorIzquierdo, Tenedor tenedorDerecho) {
+        this.id = id;
+        this.tenedorIzquierdo = tenedorIzquierdo;
+        this.tenedorDerecho = tenedorDerecho;
+    }
+
+    private void pensar() throws InterruptedException {
+        System.out.println("Filósofo " + id + " está pensando...");
+        Thread.sleep((int) (Math.random() * 2000));
+    }
+
+    private void comer() throws InterruptedException {
+        System.out.println("Filósofo " + id + " está comiendo...");
+        Thread.sleep((int) (Math.random() * 3000)); 
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                pensar(); 
+
+                // Filósofo intenta levantar los tenedores (adquirir los recursos)
+                synchronized (tenedorIzquierdo) {
+                    System.out.println("Filósofo " + id + " levantó el tenedor izquierdo.");
+                    synchronized (tenedorDerecho) {
+                        System.out.println("Filósofo " + id + " levantó el tenedor derecho.");
+                        comer(); 
+                    }
+                    System.out.println("Filósofo " + id + " soltó el tenedor derecho.");
+                }
+                System.out.println("Filósofo " + id + " soltó el tenedor izquierdo.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+public class FilosofosComensales {
+    public static void main(String[] args) {
+        Tenedor[] tenedores = new Tenedor[5];
+        Filosofo[] filosofos = new Filosofo[5];
+
+        for (int i = 0; i < 5; i++) {
+            tenedores[i] = new Tenedor();
+        }
+
+        for (int i = 0; i < 5; i++) {
+            Tenedor tenedorIzquierdo = tenedores[i];
+            Tenedor tenedorDerecho = tenedores[(i + 1) % 5];
+
+    
+            if (i == 4) {
+                filosofos[i] = new Filosofo(i + 1, tenedorDerecho, tenedorIzquierdo);
+            } else {
+                filosofos[i] = new Filosofo(i + 1, tenedorIzquierdo, tenedorDerecho);
+            }
+
+            filosofos[i].start();
+        }
+    }
+}
