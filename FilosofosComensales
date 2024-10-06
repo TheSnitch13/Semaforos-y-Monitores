@@ -1,25 +1,10 @@
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.Condition;
-
-class Tenedor {
-    private final Lock lock = new ReentrantLock();
-
-    public void levantar() {
-        lock.lock(); 
-    }
-
-    public void soltar() {
-        lock.unlock();
-    }
-}
+import java.util.concurrent.Semaphore;
 
 class Filosofo extends Thread {
-    private final int id;
-    private final Tenedor tenedorIzquierdo;
-    private final Tenedor tenedorDerecho;
+    private int id;
+    private Semaphore tenedorIzquierdo, tenedorDerecho;
 
-    public Filosofo(int id, Tenedor tenedorIzquierdo, Tenedor tenedorDerecho) {
+    public Filosofo(int id, Semaphore tenedorIzquierdo, Semaphore tenedorDerecho) {
         this.id = id;
         this.tenedorIzquierdo = tenedorIzquierdo;
         this.tenedorDerecho = tenedorDerecho;
@@ -32,7 +17,7 @@ class Filosofo extends Thread {
 
     private void comer() throws InterruptedException {
         System.out.println("Filósofo " + id + " está comiendo...");
-        Thread.sleep((int) (Math.random() * 3000)); 
+        Thread.sleep((int) (Math.random() * 3000));
     }
 
     @Override
@@ -41,16 +26,24 @@ class Filosofo extends Thread {
             while (true) {
                 pensar(); 
 
-                // Filósofo intenta levantar los tenedores (adquirir los recursos)
-                synchronized (tenedorIzquierdo) {
+                if (id % 2 == 0) { 
+                    tenedorIzquierdo.acquire();
                     System.out.println("Filósofo " + id + " levantó el tenedor izquierdo.");
-                    synchronized (tenedorDerecho) {
-                        System.out.println("Filósofo " + id + " levantó el tenedor derecho.");
-                        comer(); 
-                    }
-                    System.out.println("Filósofo " + id + " soltó el tenedor derecho.");
+                    tenedorDerecho.acquire();
+                    System.out.println("Filósofo " + id + " levantó el tenedor derecho.");
+                } else { 
+                    tenedorDerecho.acquire();
+                    System.out.println("Filósofo " + id + " levantó el tenedor derecho.");
+                    tenedorIzquierdo.acquire();
+                    System.out.println("Filósofo " + id + " levantó el tenedor izquierdo.");
                 }
+
+                comer();
+
+                tenedorIzquierdo.release();
                 System.out.println("Filósofo " + id + " soltó el tenedor izquierdo.");
+                tenedorDerecho.release();
+                System.out.println("Filósofo " + id + " soltó el tenedor derecho.");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -58,26 +51,20 @@ class Filosofo extends Thread {
     }
 }
 
-public class FilosofosComensales {
-    public static void main(String[] args) {
-        Tenedor[] tenedores = new Tenedor[5];
-        Filosofo[] filosofos = new Filosofo[5];
 
+public class FilosofosComensalesSemaforos {
+    public static void main(String[] args) {
+        Semaphore[] tenedores = new Semaphore[5];
         for (int i = 0; i < 5; i++) {
-            tenedores[i] = new Tenedor();
+            tenedores[i] = new Semaphore(1); 
         }
 
+        Filosofo[] filosofos = new Filosofo[5];
         for (int i = 0; i < 5; i++) {
-            Tenedor tenedorIzquierdo = tenedores[i];
-            Tenedor tenedorDerecho = tenedores[(i + 1) % 5];
+            Semaphore tenedorIzquierdo = tenedores[i];
+            Semaphore tenedorDerecho = tenedores[(i + 1) % 5];
 
-    
-            if (i == 4) {
-                filosofos[i] = new Filosofo(i + 1, tenedorDerecho, tenedorIzquierdo);
-            } else {
-                filosofos[i] = new Filosofo(i + 1, tenedorIzquierdo, tenedorDerecho);
-            }
-
+            filosofos[i] = new Filosofo(i + 1, tenedorIzquierdo, tenedorDerecho);
             filosofos[i].start();
         }
     }
