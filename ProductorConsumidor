@@ -1,0 +1,98 @@
+import java.util.LinkedList;
+import java.util.Queue;
+
+class BufferCompartido {
+    private final Queue<Integer> buffer;
+    private final int LIMITE;
+
+    public BufferCompartido(int limite) {
+        this.buffer = new LinkedList<>();
+        this.LIMITE = limite;
+    }
+
+    public synchronized void producir(int valor) throws InterruptedException {
+        // Si el buffer está lleno, el productor debe esperar
+        while (buffer.size() == LIMITE) {
+            System.out.println("Buffer lleno. Productor esperando...");
+            wait(); // El hilo espera hasta que se le notifique
+        }
+
+        buffer.add(valor);
+        System.out.println("Productor produjo: " + valor);
+
+        // Notificar a los consumidores que el buffer ya tiene un nuevo producto
+        notifyAll(); // Despertar a los hilos que están en espera
+    }
+
+    public synchronized int consumir() throws InterruptedException {
+        // Si el buffer está vacío, el consumidor debe esperar
+        while (buffer.isEmpty()) {
+            System.out.println("Buffer vacío. Consumidor esperando...");
+            wait(); // El hilo espera hasta que se le notifique
+        }
+
+        int valor = buffer.poll();
+        System.out.println("Consumidor consumió: " + valor);
+
+        // Notificar a los productores que el buffer tiene espacio disponible
+        notifyAll(); // Despertar a los hilos que están en espera
+        return valor;
+    }
+}
+
+class Productor extends Thread {
+    private final BufferCompartido buffer;
+
+    public Productor(BufferCompartido buffer) {
+        this.buffer = buffer;
+    }
+
+    @Override
+    public void run() {
+        try {
+            for (int i = 0; i < 10; i++) {
+                buffer.producir(i);
+                Thread.sleep(3000);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+class Consumidor extends Thread {
+    private final BufferCompartido buffer;
+
+    public Consumidor(BufferCompartido buffer) {
+        this.buffer = buffer;
+    }
+
+    @Override
+    public void run() {
+        try {
+            for (int i = 0; i < 10; i++) {
+                buffer.consumir();
+                Thread.sleep(4500);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+
+public class ProductorConsumidor {
+    public static void main(String[] args) {
+        BufferCompartido buffer = new BufferCompartido(5);
+
+        Productor productor1 = new Productor(buffer);
+        Productor productor2 = new Productor(buffer);
+
+        Consumidor consumidor1 = new Consumidor(buffer);
+        Consumidor consumidor2 = new Consumidor(buffer);
+
+        productor1.start();
+        productor2.start();
+        consumidor1.start();
+        consumidor2.start();
+    }
+}
